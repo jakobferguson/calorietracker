@@ -47,11 +47,14 @@ class LogFoodSheet(ui.View):
         PAD = 16
         y = 20
 
+        _BG = (0.07, 0.07, 0.07)
+
         # Food name header
         name_lbl = ui.Label(frame=(PAD, y, W - PAD * 2, 28))
         name_lbl.text = self.food['name']
         name_lbl.font = ('<system-bold>', 18)
         name_lbl.text_color = (1, 1, 1)
+        name_lbl.background_color = _BG
         name_lbl.number_of_lines = 2
         self.add_subview(name_lbl)
         y += 36
@@ -62,6 +65,7 @@ class LogFoodSheet(ui.View):
             brand_lbl.text = self.food['brand']
             brand_lbl.font = ('<system>', 13)
             brand_lbl.text_color = (0.6, 0.6, 0.6)
+            brand_lbl.background_color = _BG
             self.add_subview(brand_lbl)
             y += 24
 
@@ -79,6 +83,7 @@ class LogFoodSheet(ui.View):
         info_lbl.text = info
         info_lbl.font = ('<system>', 12)
         info_lbl.text_color = (0.55, 0.55, 0.55)
+        info_lbl.background_color = _BG
         info_lbl.number_of_lines = 2
         self.add_subview(info_lbl)
         y += 44
@@ -94,23 +99,30 @@ class LogFoodSheet(ui.View):
         qty_lbl.text = 'Quantity'
         qty_lbl.font = ('<system>', 14)
         qty_lbl.text_color = (0.8, 0.8, 0.8)
+        qty_lbl.background_color = _BG
         self.add_subview(qty_lbl)
 
-        self._qty_field = ui.TextField(frame=(PAD + 100, y - 4, W - PAD * 2 - 100 - 60, 32))
+        # Opaque container for the TextField — guarantees dark backing.
+        _qty_bg = ui.View(frame=(PAD + 100, y - 4, W - PAD * 2 - 100 - 60, 32))
+        _qty_bg.background_color = (0.15, 0.15, 0.15)
+        _qty_bg.corner_radius = 6
+        self.add_subview(_qty_bg)
+
+        self._qty_field = ui.TextField(frame=(4, 0, _qty_bg.width - 8, 32))
         self._qty_field.text = str(int(self.food['serving_size']))
         self._qty_field.keyboard_type = ui.KEYBOARD_DECIMAL_PAD
-        self._qty_field.background_color = (0.15, 0.15, 0.15)
+        self._qty_field.border_style = 0           # remove iOS rounded-rect white fill
+        self._qty_field.background_color = (0, 0, 0, 0)  # transparent; bg from _qty_bg
         self._qty_field.text_color = (1, 1, 1)
         self._qty_field.tint_color = (0.29, 0.85, 0.60)
-        self._qty_field.corner_radius = 6
-        self._qty_field.border_style = 0  # no system white background
         self._qty_field.delegate = self
-        self.add_subview(self._qty_field)
+        _qty_bg.add_subview(self._qty_field)
 
         unit_lbl = ui.Label(frame=(W - PAD - 52, y, 52, 24))
         unit_lbl.text = self.food['serving_unit']
         unit_lbl.font = ('<system>', 14)
         unit_lbl.text_color = (0.6, 0.6, 0.6)
+        unit_lbl.background_color = _BG
         unit_lbl.alignment = ui.ALIGN_RIGHT
         self.add_subview(unit_lbl)
         y += 44
@@ -120,6 +132,7 @@ class LogFoodSheet(ui.View):
         meal_lbl.text = 'Meal'
         meal_lbl.font = ('<system>', 14)
         meal_lbl.text_color = (0.8, 0.8, 0.8)
+        meal_lbl.background_color = _BG
         self.add_subview(meal_lbl)
 
         self._meal_seg = ui.SegmentedControl(
@@ -136,6 +149,7 @@ class LogFoodSheet(ui.View):
         self._nutrition_lbl = ui.Label(frame=(PAD, y, W - PAD * 2, 80))
         self._nutrition_lbl.font = ('<system>', 13)
         self._nutrition_lbl.text_color = (0.65, 0.65, 0.65)
+        self._nutrition_lbl.background_color = _BG
         self._nutrition_lbl.number_of_lines = 5
         self.add_subview(self._nutrition_lbl)
         y += 88
@@ -260,25 +274,34 @@ class CreateFoodView(ui.View):
         scroll.background_color = (0.07, 0.07, 0.07)  # match app dark background
         scroll.content_size = (W, len(field_defs) * 56 + 40)
 
+        _BG = (0.07, 0.07, 0.07)
+        _FIELD_BG = (0.14, 0.14, 0.14)
+
         inner_y = 12
         for key, placeholder, kb_type in field_defs:
             lbl = ui.Label(frame=(PAD, inner_y, W - PAD * 2, 18))
             lbl.text = placeholder.replace(' *', '').replace(' (optional)', '')
             lbl.font = ('<system>', 12)
             lbl.text_color = (0.55, 0.55, 0.55)
+            lbl.background_color = _BG  # opaque so text never renders on white
             scroll.add_subview(lbl)
 
-            tf = ui.TextField(frame=(PAD, inner_y + 18, W - PAD * 2, 30))
+            # Opaque container guarantees dark backing for the text field.
+            tf_bg = ui.View(frame=(PAD, inner_y + 18, W - PAD * 2, 30))
+            tf_bg.background_color = _FIELD_BG
+            tf_bg.corner_radius = 6
+            scroll.add_subview(tf_bg)
+
+            tf = ui.TextField(frame=(4, 0, W - PAD * 2 - 8, 30))
             tf.placeholder = placeholder
             tf.keyboard_type = kb_type
-            tf.background_color = (0.14, 0.14, 0.14)
+            tf.border_style = 0           # remove iOS rounded-rect white fill
+            tf.background_color = (0, 0, 0, 0)   # transparent; bg from tf_bg
             tf.text_color = (1, 1, 1)
             tf.tint_color = (0.29, 0.85, 0.60)
-            tf.corner_radius = 6
-            tf.border_style = 0  # no system white background
             if key == 'serving_size':
                 tf.text = '100'
-            scroll.add_subview(tf)
+            tf_bg.add_subview(tf)
             self._fields[key] = tf
             inner_y += 56
 
