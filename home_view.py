@@ -41,8 +41,9 @@ from models import (
 
 def _draw_ring(cx, cy, radius, thickness, progress, fg_color, bg_color=(0.15, 0.15, 0.15)):
     """Draw a progress arc ring centered at (cx, cy)."""
-    # Background ring
+    # Background ring — move_to arc start first to avoid a spurious line from (0,0)
     bg = ui.Path()
+    bg.move_to(cx + radius, cy)          # cos(0)=1, sin(0)=0
     bg.add_arc(cx, cy, radius, 0, 2 * math.pi)
     bg.line_width = thickness
     ui.set_color(bg_color)
@@ -54,6 +55,7 @@ def _draw_ring(cx, cy, radius, thickness, progress, fg_color, bg_color=(0.15, 0.
         fg = ui.Path()
         start = -math.pi / 2          # top
         end = start + p * 2 * math.pi
+        fg.move_to(cx + radius * math.cos(start), cy + radius * math.sin(start))
         fg.add_arc(cx, cy, radius, start, end)
         fg.line_width = thickness
         ui.set_color(fg_color)

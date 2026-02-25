@@ -40,7 +40,7 @@ def main():
     home.nav_controller = nav
 
     # Present full-screen on iPhone; on iPad you could use 'sheet'
-    nav.present('fullscreen', hide_title_bar=False, animated=False)
+    nav.present('fullscreen', hide_title_bar=True, animated=False)
 
 
 if __name__ == '__main__':
