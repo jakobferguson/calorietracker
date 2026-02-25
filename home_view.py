@@ -5,11 +5,17 @@ Layout:
   ┌────────────────────────────────┐
   │  < Wed Feb 25        ⚙  📋  │  ← date nav + settings/history buttons
   │                                │
-  │     [Large calorie ring]       │
-  │       1,245 / 2,000            │
-  │          kcal                  │
-  │                                │
-  │  [Fat ○] [Protein ○] [Carbs ○]│  ← mini macro rings
+  │   ╔══════════════════╗         │
+  │   ║  Calories (green)║         │  ← 4 concentric rings
+  │   ║  ┌─Protein(red)─┐║         │
+  │   ║  │ ┌Carbs(green)┐│║        │
+  │   ║  │ │ Fat(yellow)││║        │
+  │   ║  │ │  1,245     ││║        │  ← center: calories consumed
+  │   ║  │ │ /2000 kcal ││║        │
+  │   ║  │ └────────────┘│║        │
+  │   ║  └───────────────┘║        │
+  │   ╚══════════════════╝         │
+  │  F 42g  ·  P 98g  ·  C 145g   │  ← macro legend
   │                                │
   │  ┌─Breakfast─┐ ┌─Lunch──────┐  │
   │  │  320 kcal │ │  490 kcal  │  │
@@ -26,7 +32,7 @@ from datetime import date, timedelta
 
 import storage
 from models import (
-    MEAL_TYPES, MEAL_COLORS, MACRO_COLORS,
+    MEAL_TYPES, MEAL_COLORS,
     entries_for_meal, sum_nutrients, today_str
 )
 
@@ -56,102 +62,92 @@ def _draw_ring(cx, cy, radius, thickness, progress, fg_color, bg_color=(0.15, 0.
 
 # ── Ring views ────────────────────────────────────────────────────────────────
 
-class CalorieRingView(ui.View):
-    """Large central calorie ring."""
+class MultiRingView(ui.View):
+    """
+    Four concentric progress rings (outermost to innermost):
+      Calories (green/red)  →  Protein (red)  →  Carbs (green)  →  Fat (yellow)
 
-    def __init__(self, consumed=0, goal=2000, **kwargs):
+    Center shows calories consumed / goal.
+    """
+
+    # Ring spec: (attr_key, color_when_normal, thickness)
+    # Drawn outermost → innermost; gap between rings is fixed.
+    _RING_THICKNESS = 13
+    _RING_GAP = 6
+
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.consumed = consumed
-        self.goal = goal
         self.background_color = (0, 0, 0, 0)
+        # Calorie data
+        self.cal_consumed = 0
+        self.cal_goal = 2000
+        # Macro data {key: (consumed, goal)}
+        self.macros = {
+            'protein': (0, 100),
+            'carbs':   (0, 150),
+            'fat':     (0, 50),
+        }
 
     def draw(self):
         w, h = self.width, self.height
         cx, cy = w / 2, h / 2
-        radius = min(w, h) / 2 - 14
-        thickness = 18
-        progress = self.consumed / self.goal if self.goal else 0
+        t = self._RING_THICKNESS
+        gap = self._RING_GAP
 
-        # Colour shifts red if over goal
-        if progress > 1.0:
-            fg = (0.95, 0.30, 0.30)
-        else:
-            fg = (0.29, 0.85, 0.60)
+        # Compute radii from outside in
+        # Outermost centre-line radius leaves half-thickness margin at edge
+        r_cal     = min(w, h) / 2 - t / 2 - 4
+        r_protein = r_cal     - t / 2 - gap - t / 2
+        r_carbs   = r_protein - t / 2 - gap - t / 2
+        r_fat     = r_carbs   - t / 2 - gap - t / 2
 
-        _draw_ring(cx, cy, radius, thickness, progress, fg)
+        # ── Calorie ring (outermost) ─────────────────────────────────────────
+        cal_progress = self.cal_consumed / self.cal_goal if self.cal_goal else 0
+        cal_color = (0.95, 0.30, 0.30) if cal_progress > 1.0 else (0.29, 0.85, 0.60)
+        _draw_ring(cx, cy, r_cal, t, cal_progress, cal_color)
 
-        # Centre text
-        ui.set_color((1, 1, 1))
-        consumed_str = f'{int(self.consumed):,}'
-        goal_str = f'{int(self.goal):,}'
-        font_large = ('<system-bold>', 28)
-        font_small = ('<system>', 13)
+        # ── Macro rings ──────────────────────────────────────────────────────
+        from models import MACRO_COLORS
+        ring_specs = [
+            ('protein', r_protein),
+            ('carbs',   r_carbs),
+            ('fat',     r_fat),
+        ]
+        for key, radius in ring_specs:
+            consumed, goal = self.macros.get(key, (0, 1))
+            progress = consumed / goal if goal else 0
+            color = MACRO_COLORS[key]
+            _draw_ring(cx, cy, radius, t, progress, color)
 
-        # Consumed calories (large)
-        tw, th = ui.measure_string(consumed_str, font=font_large)
-        ui.draw_string(consumed_str, rect=(cx - tw / 2, cy - th - 4, tw, th),
-                       font=font_large, color=(1, 1, 1),
+        # ── Centre text ──────────────────────────────────────────────────────
+        # Available inner radius (inside the fat ring)
+        inner_r = r_fat - t / 2 - 4
+
+        consumed_str = f'{int(self.cal_consumed):,}'
+        goal_str = f'/{int(self.cal_goal):,}'
+        kcal_str = 'kcal'
+
+        font_big = ('<system-bold>', 22)
+        font_sm  = ('<system>', 11)
+
+        tw1, th1 = ui.measure_string(consumed_str, font=font_big)
+        tw2, th2 = ui.measure_string(goal_str,     font=font_sm)
+        tw3, th3 = ui.measure_string(kcal_str,     font=font_sm)
+
+        total_h = th1 + 2 + th2 + 2 + th3
+        y0 = cy - total_h / 2
+
+        ui.draw_string(consumed_str,
+                       rect=(cx - tw1 / 2, y0, tw1, th1),
+                       font=font_big, color=(1, 1, 1),
                        alignment=ui.ALIGN_CENTER)
-
-        # "/ goal kcal" (small)
-        sub = f'/ {goal_str} kcal'
-        tw2, th2 = ui.measure_string(sub, font=font_small)
-        ui.draw_string(sub, rect=(cx - tw2 / 2, cy + 2, tw2, th2),
-                       font=font_small, color=(0.7, 0.7, 0.7),
-                       alignment=ui.ALIGN_CENTER)
-
-        # Remaining label
-        remaining = max(0, self.goal - self.consumed)
-        rem_str = f'{int(remaining):,} remaining'
-        tw3, th3 = ui.measure_string(rem_str, font=font_small)
-        ui.draw_string(rem_str, rect=(cx - tw3 / 2, cy + th2 + 8, tw3, th3),
-                       font=font_small, color=(0.5, 0.5, 0.5),
-                       alignment=ui.ALIGN_CENTER)
-
-
-class MacroRingView(ui.View):
-    """Small ring for a single macro nutrient."""
-
-    def __init__(self, label, consumed, goal, color, unit='g', **kwargs):
-        super().__init__(**kwargs)
-        self.label = label
-        self.consumed = consumed
-        self.goal = goal
-        self.color = color
-        self.unit = unit
-        self.background_color = (0, 0, 0, 0)
-
-    def draw(self):
-        w, h = self.width, self.height
-        cx, cy = w / 2, h * 0.42
-        radius = min(w, h) * 0.38 - 4
-        thickness = 8
-        progress = self.consumed / self.goal if self.goal else 0
-
-        _draw_ring(cx, cy, radius, thickness, progress, self.color)
-
-        # Consumed value inside ring
-        val_str = f'{int(self.consumed)}'
-        font = ('<system-bold>', 13)
-        tw, th = ui.measure_string(val_str, font=font)
-        ui.draw_string(val_str, rect=(cx - tw / 2, cy - th / 2 - 1, tw, th),
-                       font=font, color=(1, 1, 1),
-                       alignment=ui.ALIGN_CENTER)
-
-        # Label below ring
-        font_lbl = ('<system>', 11)
-        tw2, th2 = ui.measure_string(self.label, font=font_lbl)
-        ui.draw_string(self.label,
-                       rect=(cx - tw2 / 2, cy + radius + 6, tw2, th2),
-                       font=font_lbl, color=(0.7, 0.7, 0.7),
-                       alignment=ui.ALIGN_CENTER)
-
-        # Goal below label
-        goal_str = f'/ {int(self.goal)}{self.unit}'
-        tw3, th3 = ui.measure_string(goal_str, font=font_lbl)
         ui.draw_string(goal_str,
-                       rect=(cx - tw3 / 2, cy + radius + th2 + 8, tw3, th3),
-                       font=font_lbl, color=(0.45, 0.45, 0.45),
+                       rect=(cx - tw2 / 2, y0 + th1 + 2, tw2, th2),
+                       font=font_sm, color=(0.65, 0.65, 0.65),
+                       alignment=ui.ALIGN_CENTER)
+        ui.draw_string(kcal_str,
+                       rect=(cx - tw3 / 2, y0 + th1 + th2 + 4, tw3, th3),
+                       font=font_sm, color=(0.45, 0.45, 0.45),
                        alignment=ui.ALIGN_CENTER)
 
 
@@ -269,31 +265,25 @@ class HomeView(ui.View):
         hdr.add_subview(btn_settings)
         self.add_subview(hdr)
 
-        # ── Calorie ring ─────────────────────────────────────────────────────
-        RING_SIZE = min(W - 60, 200)
-        ring_y = HDR_H + 12
-        self._calorie_ring = CalorieRingView(
+        # ── Multi-ring (calories + 3 macros concentric) ──────────────────────
+        RING_SIZE = min(W - 40, 220)
+        ring_y = HDR_H + 10
+        self._multi_ring = MultiRingView(
             frame=((W - RING_SIZE) / 2, ring_y, RING_SIZE, RING_SIZE)
         )
-        self.add_subview(self._calorie_ring)
+        self.add_subview(self._multi_ring)
 
-        # ── Macro rings row ──────────────────────────────────────────────────
-        MACRO_SIZE = (W - PAD * 2) / 3
-        macro_y = ring_y + RING_SIZE + 8
-        self._macro_views = {}
-        macros = [('Fat', 'fat'), ('Protein', 'protein'), ('Carbs', 'carbs')]
-        for i, (label, key) in enumerate(macros):
-            mv = MacroRingView(
-                label=label, consumed=0, goal=50,
-                color=MACRO_COLORS[key],
-                frame=(PAD + i * MACRO_SIZE, macro_y, MACRO_SIZE, MACRO_SIZE * 0.85),
-            )
-            mv.name = f'macro_{key}'
-            self._macro_views[key] = mv
-            self.add_subview(mv)
+        # ── Macro legend row ─────────────────────────────────────────────────
+        legend_y = ring_y + RING_SIZE + 4
+        self._legend = ui.Label(frame=(PAD, legend_y, W - PAD * 2, 18))
+        self._legend.text = 'F 0g  ·  P 0g  ·  C 0g'
+        self._legend.font = ('<system>', 12)
+        self._legend.text_color = (0.55, 0.55, 0.55)
+        self._legend.alignment = ui.ALIGN_CENTER
+        self.add_subview(self._legend)
 
         # ── Meal tiles ───────────────────────────────────────────────────────
-        tiles_y = macro_y + MACRO_SIZE * 0.85 + 12
+        tiles_y = legend_y + 24
         TILE_W = (W - PAD * 3) / 2
         TILE_H = 62
         self._meal_tiles = {}
@@ -341,16 +331,22 @@ class HomeView(ui.View):
             label = self._current_date.strftime('%a, %b %-d')
         self._date_label.text = label
 
-        # Calorie ring
-        self._calorie_ring.consumed = totals['calories']
-        self._calorie_ring.goal = goals['calories']
-        self._calorie_ring.set_needs_display()
+        # Multi-ring
+        self._multi_ring.cal_consumed = totals['calories']
+        self._multi_ring.cal_goal = goals['calories']
+        self._multi_ring.macros = {
+            'protein': (totals['protein'], goals['protein']),
+            'carbs':   (totals['carbs'],   goals['carbs']),
+            'fat':     (totals['fat'],     goals['fat']),
+        }
+        self._multi_ring.set_needs_display()
 
-        # Macro rings
-        for key, mv in self._macro_views.items():
-            mv.consumed = totals[key]
-            mv.goal = goals[key]
-            mv.set_needs_display()
+        # Macro legend
+        self._legend.text = (
+            f"Fat {totals['fat']:.0f}g  ·  "
+            f"Protein {totals['protein']:.0f}g  ·  "
+            f"Carbs {totals['carbs']:.0f}g"
+        )
 
         # Meal tiles
         for meal, tile in self._meal_tiles.items():

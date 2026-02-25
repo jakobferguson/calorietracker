@@ -22,9 +22,9 @@ MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
 MICRO_KEYS = ['fiber', 'sugar', 'sodium', 'vitamin_c', 'vitamin_a', 'calcium', 'iron']
 
 MACRO_COLORS = {
-    'fat':     (0.97, 0.65, 0.24),   # orange
-    'protein': (0.29, 0.69, 0.96),   # blue
-    'carbs':   (0.38, 0.80, 0.55),   # green
+    'fat':     (0.95, 0.85, 0.20),   # yellow
+    'protein': (0.95, 0.30, 0.30),   # red
+    'carbs':   (0.30, 0.85, 0.40),   # green
 }
 
 MEAL_COLORS = {
