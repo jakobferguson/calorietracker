@@ -15,6 +15,12 @@ import os
 import hashlib
 import threading
 
+try:
+    from objc_util import on_main_thread as _on_main_thread
+    def _main(fn, *args): _on_main_thread(fn)(*args)
+except ImportError:
+    def _main(fn, *args): fn(*args)
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/jakobferguson/calorietracker/claude/calorie-tracker-app-g20kn'
@@ -132,23 +138,23 @@ class UpdaterView(ui.View):
         errors = []
 
         for filename in APP_FILES:
-            ui.in_main_thread(self._set_status, f'Checking {filename}…')
+            _main(self._set_status, f'Checking {filename}…')
             try:
                 remote = _fetch(filename)
             except Exception as e:
                 errors.append(filename)
-                ui.in_main_thread(self._append_log, f'  ✗ {filename}: {e}')
+                _main(self._append_log, f'  ✗ {filename}: {e}')
                 continue
 
             local = _local_content(filename)
             if local is not None and _md5(local) == _md5(remote):
                 skipped.append(filename)
-                ui.in_main_thread(self._append_log, f'  – {filename}: up to date')
+                _main(self._append_log, f'  – {filename}: up to date')
             else:
                 _write(filename, remote)
                 updated.append(filename)
                 status = 'new' if local is None else 'updated'
-                ui.in_main_thread(self._append_log, f'  ✓ {filename}: {status}')
+                _main(self._append_log, f'  ✓ {filename}: {status}')
 
         summary = (
             f'\nDone. '
@@ -160,7 +166,7 @@ class UpdaterView(ui.View):
         if updated:
             summary += '\n\nRestart the app to apply changes.'
 
-        ui.in_main_thread(self._finish, summary)
+        _main(self._finish, summary)
 
     def _set_status(self, text):
         self._status.text = text
