@@ -168,14 +168,8 @@ class MealTileView(ui.View):
         self.background_color = (0.12, 0.12, 0.12)
         self.corner_radius = 12
 
-        # Tap recognizer
-        rec = ui.GestureRecognizer('tap')
-        rec.action = self._tapped
-        self.add_gesture_recognizer(rec)
-
-    def _tapped(self, gr):
-        if gr.state == ui.GESTURE_RECOGNIZED:
-            self._on_tap(self.meal_type)
+    def touch_ended(self, touch):
+        self._on_tap(self.meal_type)
 
     def draw(self):
         w, h = self.width, self.height
