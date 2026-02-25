@@ -37,6 +37,7 @@ class SettingsView(ui.View):
         PAD = 16
 
         scroll = ui.ScrollView(frame=(0, 0, W, self.height - 60))
+        scroll.background_color = (0.07, 0.07, 0.07)  # match app dark background
         scroll.content_size = (W, len(GOAL_FIELDS) * 56 + 60)
 
         y = 16
@@ -67,6 +68,7 @@ class SettingsView(ui.View):
             tf.text_color = (1, 1, 1)
             tf.tint_color = (0.29, 0.85, 0.60)
             tf.corner_radius = 6
+            tf.border_style = 0  # no system white background
             scroll.add_subview(tf)
             self._fields[key] = tf
             y += 56

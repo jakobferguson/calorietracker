@@ -11,6 +11,12 @@ Flow:
 import threading
 import ui
 
+try:
+    from objc_util import on_main_thread as _on_main_thread
+    def _main(fn, *args): _on_main_thread(fn)(*args)
+except ImportError:
+    def _main(fn, *args): fn(*args)
+
 import api
 import storage
 from models import (
@@ -97,6 +103,7 @@ class LogFoodSheet(ui.View):
         self._qty_field.text_color = (1, 1, 1)
         self._qty_field.tint_color = (0.29, 0.85, 0.60)
         self._qty_field.corner_radius = 6
+        self._qty_field.border_style = 0  # no system white background
         self._qty_field.delegate = self
         self.add_subview(self._qty_field)
 
@@ -250,6 +257,7 @@ class CreateFoodView(ui.View):
         ]
 
         scroll = ui.ScrollView(frame=(0, 0, W, self.height - 60))
+        scroll.background_color = (0.07, 0.07, 0.07)  # match app dark background
         scroll.content_size = (W, len(field_defs) * 56 + 40)
 
         inner_y = 12
@@ -267,6 +275,7 @@ class CreateFoodView(ui.View):
             tf.text_color = (1, 1, 1)
             tf.tint_color = (0.29, 0.85, 0.60)
             tf.corner_radius = 6
+            tf.border_style = 0  # no system white background
             if key == 'serving_size':
                 tf.text = '100'
             scroll.add_subview(tf)
@@ -366,6 +375,7 @@ class SearchView(ui.View):
         self._search_field.background_color = (0, 0, 0, 0)
         self._search_field.text_color = (1, 1, 1)
         self._search_field.tint_color = (0.29, 0.85, 0.60)
+        self._search_field.border_style = 0  # no system white background
         self._search_field.delegate = self
         search_bg.add_subview(self._search_field)
 
@@ -413,7 +423,7 @@ class SearchView(ui.View):
 
         def _search():
             results = api.search_foods(query, max_results=25)
-            ui.in_main_thread(self._update_results, results)
+            _main(self._update_results, results)
 
         threading.Thread(target=_search, daemon=True).start()
 
